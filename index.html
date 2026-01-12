@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>勝潔實-居家清潔預約系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+    <style>
+        /* 深色主題背景 */
+        body { background-color: #2f314a; font-family: -apple-system, sans-serif; padding-bottom: 80px; color: #f0f0f0; }
+        
+        /* 卡片樣式調整為深色模式 */
+        .card { background-color: #3b3d5c; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card-body h5 { color: #fff; border-bottom: 1px solid #555; padding-bottom: 10px; margin-bottom: 15px; }
+        
+        .step-section { display: none; }
+        .step-section.active { display: block; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Nav Tabs 深色化 & 金色 */
+        .nav-tabs { border-bottom: 1px solid #555; }
+        .nav-tabs .nav-link { color: #ccc; }
+        .nav-tabs .nav-link.active { 
+            background-color: #3b3d5c; 
+            color: #ddae4e; 
+            border-color: #555 #555 #3b3d5c; 
+            font-weight: bold; 
+            border-bottom: 2px solid #ddae4e; 
+        }
+        
+        /* 服務項目列表 */
+        .service-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #4a4c6e; border-bottom: 1px solid #555; margin-bottom: 5px; border-radius: 5px; }
+        .service-row strong { color: #fff; }
+        .service-row small { color: #ccc !important; }
+        
+        /* 數量按鈕 (金色) */
+        .qty-btn { 
+            width: 30px; height: 30px; border-radius: 50%; 
+            border: 1px solid #ddae4e; 
+            background: transparent; 
+            color: #ddae4e; 
+            font-weight: bold; 
+        }
+        .qty-input { width: 35px; text-align: center; border: none; background: transparent; font-weight: bold; color: #fff; }
+        
+        /* 日曆控制項 */
+        .calendar-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: #4a4c6e; padding: 10px; border-radius: 8px; border: 1px solid #555; }
+        .btn-cal-nav { background: #3b3d5c; border: 1px solid #555; border-radius: 5px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; }
+        .current-month-label { font-weight: bold; font-size: 1.1rem; color: #ddae4e; }
+        
+        /* 日曆格子 */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .cal-day-header { text-align: center; font-size: 0.8rem; font-weight: bold; color: #ccc; padding-bottom: 5px; }
+        
+        .cal-cell { 
+            background: #4a4c6e; border: 1px solid #555; border-radius: 5px; min-height: 70px; 
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start; 
+            padding: 5px 1px; cursor: pointer; position: relative; color: #fff;
+        }
+        .cal-cell.today { border: 2px solid #ddae4e; }
+        .cal-cell.selected { 
+            background-color: #ddae4e !important; 
+            border-color: #ddae4e; 
+            color: #fff; 
+            box-shadow: 0 0 10px rgba(221, 174, 78, 0.5); 
+        }
+        .cal-cell.selected::after { content: '✔'; position: absolute; top: 2px; right: 2px; font-size: 12px; color: #fff; background: rgba(0,0,0,0.3); border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+        .cal-cell.disabled { background-color: #2a2c42; color: #555; cursor: not-allowed; border-color: #333; }
+        
+        .cal-date { font-weight: bold; font-size: 0.9rem; margin-bottom: 2px; }
+        
+        /* 依身分別區分顏色 Badge */
+        .cal-badge { font-size: 0.6rem; padding: 1px 2px; border-radius: 3px; width: 96%; text-align: center; line-height: 1.1; margin-bottom: 1px; color: #fff; }
+        .badge-a { background-color: #0d6efd; /* Blue */ }
+        .badge-b { background-color: #198754; /* Green */ }
+        .badge-c { background-color: #fd7e14; /* Orange */ }
+        
+        .cal-tag-recommend {
+            position: absolute; top: -5px; left: -5px;
+            background: #ff3333; color: white;
+            border-radius: 50%; width: 22px; height: 22px;
+            font-size: 12px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.5); z-index: 10;
+            border: 2px solid #fff;
+            animation: popIn 0.3s ease-out;
+        }
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+
+        /* 時段按鈕 (金色) */
+        .slot-btn { 
+            width: 100%; margin-bottom: 8px; text-align: left; padding: 10px; 
+            border: 1px solid #ddae4e; 
+            background: transparent; 
+            color: #ddae4e; 
+            border-radius: 8px; position: relative; 
+        }
+        .slot-btn.active { background: #ddae4e; color: white; }
+        .rank-badge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: white; color: #b08d42; width: 20px; height: 20px; border-radius: 50%; text-align: center; font-size: 12px; line-height: 20px; display: none; }
+        .slot-btn.active .rank-badge { display: block; }
+        
+        /* 底部導航 */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #2f314a; padding: 10px; display: flex; gap: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); z-index: 1000; border-top: 1px solid #444; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; color: #fff; }
+        
+        /* 輸入框樣式 */
+        .form-control, .form-select { background-color: #4a4c6e; border: 1px solid #555; color: #fff; }
+        .form-control:focus, .form-select:focus { 
+            background-color: #55577a; color: #fff; 
+            border-color: #ddae4e; 
+            box-shadow: 0 0 0 0.25rem rgba(221, 174, 78, 0.25); 
+        }
+        .input-group-text { background-color: #3b3d5c; border-color: #555; color: #ccc; }
+        .form-control::placeholder { color: #aaa; }
+
+        /* 其他 */
+        .img-box { float: left; width: 70px; height: 70px; margin: 5px; position: relative; border: 1px solid #555; }
+        .img-box img { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; }
+        .btn-del-img { position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; text-align: center; cursor: pointer; }
+        
+        #promo-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; display: none; justify-content: center; align-items: center; }
+        #promo-content { position: relative; max-width: 90%; max-height: 90%; }
+        #promo-content img { width: 100%; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        
+        /* 提示框與按鈕 */
+        .bg-light { background-color: #4a4c6e !important; color: #fff; }
+        .text-muted { color: #ccc !important; }
+        .btn-outline-gold { color: #ddae4e; border-color: #ddae4e; }
+        .btn-outline-gold:hover { color: #fff; background-color: #ddae4e; border-color: #ddae4e; }
+        .text-gold { color: #ddae4e !important; }
+        
+        /* 圖例樣式 */
+        .legend-box { display: flex; gap: 10px; justify-content: center; margin-bottom: 8px; font-size: 0.75rem; color: #ccc; }
+        .legend-item { display: flex; align-items: center; gap: 3px; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay"><div class="spinner-border text-gold"></div><div class="mt-2">處理中...</div></div>
+
+<div id="promo-overlay">
+    <div id="promo-content">
+        <img src="https://i.ibb.co/pBsf5s7f/promotion.jpg" alt="優惠活動">
+    </div>
+</div>
+
+<div class="container mt-3">
+    <div class="d-flex justify-content-center align-items-center mb-4">
+        <img src="SJS_LOGO_ol_05_0.jpg" alt="Logo" style="height: 50px; margin-right: 12px; border-radius: 5px;">
+        <h4 class="fw-bold mb-0" style="color: #ddae4e;">勝潔實-居家清潔</h4>
+    </div>
+
+    <div id="step1" class="step-section active">
+        <div class="card shadow-sm"><div class="card-body">
+            <h5>1. 服務地區</h5>
+            <select id="city-select" class="form-select mb-3" onchange="updateDistricts()">
+                <option value="" disabled selected>請選擇縣市</option>
+            </select>
+            <select id="district-select" class="form-select" disabled><option value="">請先選擇縣市</option></select>
+            <div id="other-city-alert" class="alert alert-warning mt-3" style="display:none; background-color: #594a28; color: #ffca2c; border: 1px solid #7a6332;">
+                <small>⚠️ 選擇其他縣市可能會產生額外車馬費，請務必填寫完整地址以便評估。</small>
+            </div>
+        </div></div>
+    </div>
+
+    <div id="step2" class="step-section">
+        <div class="card shadow-sm"><div class="card-body p-2">
+            <h5>2. 服務項目</h5>
+            <div class="alert alert-secondary small py-2 mb-3" style="background-color: #3b3d5c; color: #ccc; border: 1px solid #555;">
+                ❄️ 分離式冷氣優惠：<br>
+                1台 $2000 | 2台 $3000 | 3台 $4500<br>
+                4台以上每加1台 +$1500
+            </div>
+            <ul class="nav nav-tabs nav-fill mb-3" id="myTab" role="tablist">
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#content-a">A. 冷氣/家電</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#content-b">B. 居家/清潔</button></li>
+            </ul>
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="content-a"></div>
+                <div class="tab-pane fade" id="content-b"></div>
+            </div>
+            <div class="alert alert-info mt-3 d-flex justify-content-between align-items-center mb-0" style="background-color: #3d352b; border-color: #ddae4e; color: #ffebb7;">
+                <span>預估總額</span><strong class="fs-4 text-gold">$<span id="total-price">0</span></strong>
+            </div>
+            <div class="text-end text-muted small mt-1">預估總工時: <span id="total-time">0</span> 分鐘</div>
+        </div></div>
+    </div>
+
+    <div id="step3" class="step-section">
+        <div class="card shadow-sm"><div class="card-body">
+            <h5>3. 上傳照片 (選填)</h5>
+            <div class="mb-3"><label class="btn btn-outline-gold w-100">➕ 選擇照片<input type="file" accept="image/*" multiple hidden onchange="handleFiles(this.files)"></label></div>
+            <div id="preview-area" class="clearfix"></div>
+            <p class="text-muted small mt-2">事前提供照片，師傅才能提供更完善的服務。</p>
+        </div></div>
+    </div>
+
+    <div id="step4" class="step-section">
+        <div class="card shadow-sm"><div class="card-body p-2">
+            <h5>4. 選擇預約日期</h5>
+            <div class="alert alert-warning small py-1" style="background-color: #594a28; color: #ffca2c; border: 1px solid #7a6332;">
+                請選擇 <b>3 個時段</b>。<br>
+                <span class="badge bg-danger rounded-circle">推</span> 表示師傅當天已在同縣市服務。
+            </div>
+            
+            <div class="legend-box">
+                <div class="legend-item"><div class="legend-dot" style="background:#0d6efd;"></div>師傅A</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#198754;"></div>師傅B</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#fd7e14;"></div>師傅C</div>
+            </div>
+
+            <div class="calendar-controls">
+                <div class="btn-cal-nav" onclick="changeMonth(-1)">&#10094;</div>
+                <div class="current-month-label" id="cal-month-label"></div>
+                <div class="btn-cal-nav" onclick="changeMonth(1)">&#10095;</div>
+            </div>
+            <div class="calendar-grid mb-2">
+                <div class="cal-day-header text-danger">日</div><div class="cal-day-header">一</div><div class="cal-day-header">二</div><div class="cal-day-header">三</div><div class="cal-day-header">四</div><div class="cal-day-header">五</div><div class="cal-day-header text-danger">六</div>
+            </div>
+            <div id="calendar-body" class="calendar-grid">
+                <div class="text-center w-100 py-3" style="grid-column: 1 / -1;">載入行程表...</div>
+            </div>
+            <div id="time-slot-section" style="display:none;" class="mt-3 border-top pt-3">
+                <h6 class="fw-bold">📅 <span id="selected-date-display"></span> 可預約時段</h6>
+                <div id="slots-container" class="row g-2"></div>
+            </div>
+        </div></div>
+    </div>
+
+    <div id="step5" class="step-section">
+        <div class="card shadow-sm"><div class="card-body">
+            <h5>5. 確認資料</h5>
+            <input type="text" id="user-name" class="form-control mb-3" placeholder="稱呼">
+            <input type="tel" id="user-phone" class="form-control mb-3" placeholder="電話">
+            <div class="input-group mb-3"><span class="input-group-text" id="addr-prefix"></span><input type="text" id="user-addr" class="form-control" placeholder="地址 (請填寫完整)"></div>
+            <textarea id="user-remarks" class="form-control mb-3" placeholder="備註需求 (例如：建議停車位置、社區特殊需求、特殊型號/材質...)"></textarea>
+            
+            <div class="bg-light p-3 rounded mb-3"><h6 class="fw-bold">已選時段</h6><ul id="final-slot-list" class="ps-3 mb-0 small"></ul></div>
+            <div class="bg-light p-3 rounded">
+                <div id="final-item-list" class="small text-muted"></div>
+                <div class="text-end fw-bold text-gold mt-1">總計: $<span id="final-price">0</span></div>
+                <div class="text-end small text-warning mt-2" style="font-size: 0.8rem; border-top: 1px dashed #555; padding-top: 5px;">
+                    (此為預估金額，視情況依當天施作環境、其他縣市及施作難易度為主)
+                </div>
+            </div>
+        </div></div>
+    </div>
+</div>
+
+<div class="bottom-nav">
+    <button id="btn-prev" class="btn btn-secondary w-50" onclick="changeStep(-1)" disabled>上一步</button>
+    <button id="btn-next" class="btn btn-primary w-50" onclick="changeStep(1)">下一步</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // ================= 設定區 =================
+    // ★ 請確認此 URL 是否為您部署的 GAS Web App 網址
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxJHiOzjF4tLA7QLhB8sV9xIGEPajpKBoy6dW8hEDLIbYrQlwMDBP29JSNPtnCHh_yo/exec"; 
+    const LIFF_ID = "2008804953-Zf22ukHp"; 
+    // =========================================
+
+    const CITY_DATA = {
+        "台北市": ["中正區","大同區","中山區","松山區","大安區","萬華區","信義區","士林區","北投區","內湖區","南港區","文山區"],
+        "新北市": ["板橋區","三重區","中和區","永和區","新莊區","新店區","土城區","蘆洲區","樹林區","汐止區","鶯歌區","三峽區","淡水區","瑞芳區","五股區","泰山區","林口區","深坑區","石碇區","坪林區","三芝區","石門區","八里區","平溪區","雙溪區","貢寮區","金山區","萬里區","烏來區"],
+        "桃園市": ["桃園區","中壢區","大溪區","楊梅區","蘆竹區","大園區","龜山區","八德區","龍潭區","平鎮區","新屋區","觀音區","復興區"],
+        "其他縣市": []
+    };
+
+    const CATALOG = { 
+        'A': { 'ac_split':{n:'分離式冷氣',t:60,p:2000}, 'ac_window':{n:'窗型冷氣',t:120,p:3500}, 'ac_hidden':{n:'吊隱式冷氣',t:120,p:3000}, 'ac_4way':{n:'四方吹冷氣',t:150,p:4500}, 'wash_top':{n:'直立洗',t:90,p:1500}, 'wash_drum':{n:'滾筒洗',t:180,p:3500} },
+        'B': { 'bath':{n:'浴室鍍膜(間)',t:210,p:4500}, 'bed_1':{n:'洗床(單人)',t:180,p:1500}, 'bed_2':{n:'洗床(雙人)',t:180,p:2500}, 'sofa_1':{n:'洗沙發(單人)',t:120,p:1500}, 'sofa_2':{n:'洗沙發(雙人)',t:120,p:2000}, 'sofa_all':{n:'洗沙發(全組)',t:120,p:3500}, 'mite_home':{n:'居家除塵蟎(間)',t:60,p:2000}, 'mite_sofa_1':{n:'除蟎-沙發(單)',t:60,p:600}, 'mite_sofa_2':{n:'除蟎-沙發(雙)',t:60,p:1000}, 'mite_sofa_l':{n:'除蟎-沙發(L型)',t:60,p:1500}, 'mite_bed_1':{n:'除蟎-床(單)',t:60,p:600}, 'mite_bed_2':{n:'除蟎-床(雙)',t:60,p:1200} }
+    };
+
+    let currentStep = 1;
+    let order = { items:{}, totalPrice:0, totalTime:0, images:[], slots:[], tempTimeA:0, tempTimeB:0 };
+    let userProfile = null;
+    let viewDate = new Date(); 
+    let hasShownPromo = false; 
+    let currentBusyMap = {}; 
+
+    window.onload = async () => {
+        initCitySelect();
+        renderMenu('A','content-a'); renderMenu('B','content-b');
+        try { 
+            await liff.init({liffId:LIFF_ID}); 
+            if(liff.isLoggedIn()){ 
+                userProfile=await liff.getProfile(); 
+                document.getElementById('user-name').value=userProfile.displayName; 
+            } else liff.login(); 
+        } catch(e){ console.log("LIFF Error:", e); }
+        loadMonthSchedule(); 
+    };
+
+    function initCitySelect() {
+        const citySelect = document.getElementById('city-select');
+        for (const city in CITY_DATA) {
+            citySelect.add(new Option(city, city));
+        }
+    }
+
+    function updateDistricts(){ 
+        const c=document.getElementById('city-select').value, d=document.getElementById('district-select'); 
+        d.innerHTML='<option value="">請選區域</option>'; d.disabled=false;
+        const alertBox = document.getElementById('other-city-alert');
+        if(c==='其他縣市'){ 
+            d.innerHTML='<option value="無">無</option>'; 
+            alertBox.style.display = 'block'; 
+            Swal.fire({ icon: 'warning', title: '注意', text: '您選擇了其他縣市，可能會有額外的車馬費，師傅將與您聯繫報價。' });
+        } else {
+            alertBox.style.display = 'none'; 
+            if(CITY_DATA[c]) CITY_DATA[c].forEach(x=>d.add(new Option(x,x)));
+        }
+        updateAddrPrefix();
+    }
+    
+    function updateAddrPrefix(){ 
+        const c=document.getElementById('city-select').value;
+        const d=document.getElementById('district-select').value; 
+        if(c&&d) {
+            let displayDistrict = (d === '無') ? '' : d;
+            document.getElementById('addr-prefix').innerText = c + displayDistrict; 
+        }
+    }
+
+    function renderMenu(type,id){
+        let h=''; 
+        for(let k in CATALOG[type]){
+            let i=CATALOG[type][k];
+            h+=`<div class="service-row"><div><strong>${i.n}</strong><br><small class="text-muted">$${i.p}</small></div><div class="qty-control"><button class="qty-btn" onclick="chQty('${k}','${type}',-1)">-</button><input id="qty-${k}" class="qty-input" value="0" readonly><button class="qty-btn" onclick="chQty('${k}','${type}',1)">+</button></div></div>`;
+        }
+        document.getElementById(id).innerHTML=h;
+    }
+    
+    function chQty(k,type,d){
+        let el=document.getElementById(`qty-${k}`), v=parseInt(el.value)+d;
+        if(v<0)v=0; el.value=v; order.items[k]=v;
+        let p=0, timeA=0, timeB=0;
+        let splitAcCount = order.items['ac_split'] || 0;
+        let splitAcPrice = 0;
+        if (splitAcCount === 1) splitAcPrice = 2000;
+        else if (splitAcCount >= 2) splitAcPrice = splitAcCount * 1500; 
+
+        for(let key in order.items){
+            let qty = order.items[key];
+            if(qty>0){
+                if (key === 'ac_split') {
+                    p += splitAcPrice;
+                    timeA += CATALOG.A[key].t * qty;
+                } else {
+                    if(CATALOG.A[key]){ p+=CATALOG.A[key].p*qty; timeA+=CATALOG.A[key].t*qty; }
+                    else if(CATALOG.B[key]){ p+=CATALOG.B[key].p*qty; timeB+=CATALOG.B[key].t*qty; }
+                }
+            }
+        }
+        order.totalPrice=p;
+        order.totalTime = Math.max(timeA, timeB); 
+        document.getElementById('total-price').innerText=p;
+        document.getElementById('total-time').innerText=order.totalTime;
+
+        let totalCount = 0;
+        for (let key in order.items) {
+            totalCount += (order.items[key] || 0); 
+        }
+
+        if (totalCount >= 5 && d > 0) { 
+             Swal.fire({ toast: true, position: 'top', icon: 'info', title: '件數較多提醒', text: '建議您直接與師傅聯絡，或繼續預約由師傅為您安排。', timer: 3000, showConfirmButton: false });
+        }
+    }
+
+    function handleFiles(fs){ 
+        if(order.images.length+fs.length>10)return Swal.fire('最多10張');
+        Array.from(fs).forEach(f=>{
+            let r=new FileReader(); r.readAsDataURL(f);
+            r.onload=e=>{
+                let img=new Image(); img.src=e.target.result;
+                img.onload=()=>{
+                    let c=document.createElement('canvas'), ctx=c.getContext('2d'), s=800/img.width;
+                    c.width=800; c.height=img.height*s; ctx.drawImage(img,0,0,c.width,c.height);
+                    order.images.push(c.toDataURL('image/jpeg',0.7));
+                    let d=document.createElement('div'); d.className='img-box'; d.innerHTML=`<img src="${order.images[order.images.length-1]}"><div class="btn-del-img" onclick="this.parentNode.remove()">×</div>`;
+                    document.getElementById('preview-area').appendChild(d);
+                }
+            }
+        });
+    }
+
+    function changeMonth(delta) { viewDate.setMonth(viewDate.getMonth() + delta); loadMonthSchedule(); }
+    
+    function loadMonthSchedule() {
+        let year = viewDate.getFullYear(), month = viewDate.getMonth();
+        document.getElementById('cal-month-label').innerText = `${year}年 ${month+1}月`;
+        document.getElementById('calendar-body').innerHTML = '<div class="text-center w-100 py-3" style="grid-column: 1/-1"><div class="spinner-border text-gold"></div></div>';
+        fetch(GAS_URL, {method:'POST', body:JSON.stringify({
+            action:'getBusySchedule', 
+            year: year, 
+            month: month,
+            items: order.items 
+        })})
+        .then(r=>r.json()).then(res=>{ 
+            currentBusyMap = res; 
+            renderCalendarGrid(year, month, res); 
+        })
+        .catch(e=>document.getElementById('calendar-body').innerHTML='<div class="text-danger p-3" style="grid-column:1/-1">載入失敗</div>');
+    }
+
+    function renderCalendarGrid(year, month, busyMap){
+        let html = '', firstDay = new Date(year, month, 1).getDay(), daysInMonth = new Date(year, month + 1, 0).getDate();
+        let today = new Date(); today.setHours(0,0,0,0);
+        
+        let userCity = document.getElementById('city-select').value; 
+
+        for(let i=0; i<firstDay; i++){ html += `<div class="cal-cell" style="background:#2a2c42;cursor:default;"></div>`; }
+        
+        for(let i=1; i<=daysInMonth; i++){
+            let d = new Date(year, month, i);
+            let dateStr = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+            
+            let data = busyMap[dateStr] || { regions: [], hasSlot: true }; 
+            let regions = data.regions;
+            let hasSlot = data.hasSlot;
+
+            let badgeHtml = regions.map(r => {
+                let badgeClass = '';
+                if (r.type === 'A') badgeClass = 'badge-a';
+                else if (r.type === 'B') badgeClass = 'badge-b';
+                else if (r.type === 'C') badgeClass = 'badge-c';
+                
+                let displayName = r.name.replace(/(..[縣市])/, '$1<br>');
+                return `<div class="cal-badge ${badgeClass}">${displayName}</div>`;
+            }).join('');
+            
+            let recommendTag = '';
+            if (d >= today && regions.length > 0 && hasSlot && userCity && userCity !== '其他縣市') {
+                let isMatch = regions.some(r => r.name.startsWith(userCity));
+                if (isMatch) {
+                    recommendTag = `<div class="cal-tag-recommend">推</div>`;
+                }
+            }
+
+            if (d < today) {
+                html += `<div class="cal-cell disabled"><div class="cal-date">${i}</div>${badgeHtml}</div>`;
+            } else if (!hasSlot) {
+                html += `<div class="cal-cell disabled" style="background:#3b2a2a; border-color:#5a3333;">
+                            <div class="cal-date text-danger">${i}</div>
+                            <div style="font-size:10px; color:#ff6b6b; font-weight:bold;">已滿</div>
+                         </div>`;
+            } else {
+                html += `<div class="cal-cell" onclick="selectDate('${dateStr}', this)">
+                            ${recommendTag}
+                            <div class="cal-date">${i}</div>
+                            ${badgeHtml}
+                         </div>`;
+            }
+        }
+        document.getElementById('calendar-body').innerHTML = html;
+    }
+
+    function selectDate(dateStr, el){
+        document.querySelectorAll('.cal-cell').forEach(c=>c.classList.remove('selected')); el.classList.add('selected');
+        document.getElementById('time-slot-section').style.display='block';
+        document.getElementById('selected-date-display').innerText = dateStr;
+        document.getElementById('slots-container').innerHTML='<div class="text-center w-100 py-3"><div class="spinner-border text-gold"></div></div>';
+        fetch(GAS_URL, {method:'POST', body:JSON.stringify({action:'getSlots', date:dateStr, items:order.items})})
+        .then(r=>r.json()).then(res=>{
+            let h='';
+            if(res.slots.length===0) h='<div class="alert alert-danger w-100" style="background-color: #5a3333; border-color: #8a4444; color: #ffcccc;">本日預約已滿</div>';
+            else res.slots.forEach(s=>{
+                let active = order.slots.some(x=>x.date===dateStr && x.time===s.time) ? 'active' : '';
+                let rank = active ? order.slots.findIndex(x=>x.date===dateStr && x.time===s.time)+1 : '';
+                h+=`<div class="col-6"><button class="slot-btn ${active}" onclick="toggleSlot('${dateStr}','${s.time}',this)">${s.label}<span class="rank-badge">${rank}</span></button></div>`;
+            });
+            document.getElementById('slots-container').innerHTML = h;
+            // timeA, timeB, timeC 暫時不需顯示，後端會處理
+        });
+    }
+
+    function toggleSlot(d, t, btn){
+        let idx = order.slots.findIndex(s=>s.date===d && s.time===t);
+        if(idx!==-1){ 
+            order.slots.splice(idx,1); 
+            btn.classList.remove('active'); 
+            btn.querySelector('.rank-badge').style.display='none'; 
+        } else {
+            if(order.slots.length>=3) return Swal.fire('最多3個時段');
+            
+            let isRec = false;
+            let userCity = document.getElementById('city-select').value;
+            if (currentBusyMap && currentBusyMap[d] && currentBusyMap[d].regions && userCity && userCity !== '其他縣市') {
+                if (currentBusyMap[d].regions.some(r => r.name.startsWith(userCity))) {
+                    isRec = true;
+                }
+            }
+
+            order.slots.push({date:d, time:t, isRec: isRec}); 
+            
+            btn.classList.add('active'); 
+            btn.querySelector('.rank-badge').innerText = order.slots.length; 
+            btn.querySelector('.rank-badge').style.display='block';
+            
+            let currentCount = order.slots.length;
+            if(currentCount < 3) {
+                 Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `已選第 ${currentCount} 順位`, text: `請繼續選擇第 ${currentCount + 1} 順位`, showConfirmButton: false, timer: 1500 });
+            } else {
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '3個時段選擇完畢！', text: '請點擊下一步確認資料', showConfirmButton: false, timer: 2000 });
+            }
+        }
+    }
+
+    function changeStep(d){
+        if(d===1){
+            if(currentStep===1 && !document.getElementById('district-select').value) return Swal.fire('請選地區');
+            
+            if(currentStep===1 && !hasShownPromo) {
+                document.getElementById('promo-overlay').style.display = 'flex';
+                hasShownPromo = true;
+                setTimeout(() => { document.getElementById('promo-overlay').style.display = 'none'; }, 3000);
+            }
+
+            if(currentStep===2 && order.totalPrice===0) return Swal.fire('請選服務');
+            
+            if(currentStep===4){
+                if(order.slots.length !== 3) return Swal.fire('請選擇 3 個時段', '為了方便安排，請務必選擇 3 個志願序時段才能繼續喔！', 'warning');
+                updateAddrPrefix(); 
+                document.getElementById('final-item-list').innerText = Object.keys(order.items).filter(k=>order.items[k]>0).map(k=>(CATALOG.A[k]||CATALOG.B[k]).n+'x'+order.items[k]).join(', ');
+                document.getElementById('final-price').innerText = order.totalPrice;
+                document.getElementById('final-slot-list').innerHTML = order.slots.map((s,i)=>`<li>順位${i+1}: ${s.date} ${s.time}</li>`).join('');
+            }
+            if(currentStep===5 && d===1) { submitOrder(); return; }
+        }
+        currentStep+=d;
+        document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active'));
+        document.getElementById(`step${currentStep}`).classList.add('active');
+        document.getElementById('btn-prev').disabled=(currentStep===1);
+        document.getElementById('btn-next').innerText=(currentStep===5)?'確認預約':'下一步';
+        if(currentStep===4) loadMonthSchedule();
+        window.scrollTo(0,0);
+    }
+
+    function submitOrder(){
+        let n=document.getElementById('user-name').value, p=document.getElementById('user-phone').value, a=document.getElementById('user-addr').value;
+        let city = document.getElementById('city-select').value;
+        let remarks = document.getElementById('user-remarks').value; 
+
+        if(city === '其他縣市' && a.length < 5) return Swal.fire('請填寫完整地址', '選擇其他縣市時，請務必填寫詳細地址以便我們評估車馬費。', 'warning');
+        
+        if(!n||!p||!a) return Swal.fire('請填完整資料');
+        
+        document.getElementById('loading-overlay').style.display='flex';
+        
+        fetch(GAS_URL, {
+            method:'POST',
+            body:JSON.stringify({
+                action:'submitOrder', 
+                userId: userProfile ? userProfile.userId : 'Guest',
+                name:n, phone:p, city:city, district:document.getElementById('district-select').value, address:a,
+                items:order.items, summary:document.getElementById('final-item-list').innerText, totalPrice:order.totalPrice,
+                selectedSlots:order.slots, images:order.images, timeA:order.tempTimeA, timeB:order.tempTimeB,
+                remarks: remarks 
+            })
+        })
+        .then(r=>r.json())
+        .then(res=>{
+            document.getElementById('loading-overlay').style.display='none';
+            if(res.status==='success') Swal.fire('成功','已收到您的預約請求，師傅會盡快協助確認，請留意您的LINE通知','success').then(()=>liff.closeWindow());
+            else Swal.fire('失敗',res.msg,'error');
+        })
+        .catch(e=>{ 
+            document.getElementById('loading-overlay').style.display='none'; 
+            console.error(e);
+            Swal.fire('錯誤', '系統連線異常，請檢查網路或稍後再試: ' + e.toString(), 'error'); 
+        });
+    }
+</script>
+</body>
+</html>
